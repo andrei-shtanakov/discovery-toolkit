@@ -1,6 +1,6 @@
-"""gate_check — линтер discovery-brief по контракту DISCOVERY-BRIEF-CONTRACT.md (v1).
+"""gate_check — линтер discovery-brief по контракту DISCOVERY-BRIEF-CONTRACT.md (v1.1).
 
-Правила GC-01…GC-14 — нормативный реестр в контракте §5. Каждое finding несёт ID
+Правила GC-01…GC-16 — нормативный реестр в контракте §5. Каждое finding несёт ID
 правила; выход 1, если есть хотя бы одна ошибка.
 
 Запуск: uv run gate_check.py <brief.md> [<brief2.md> ...]
@@ -166,8 +166,36 @@ def parse_brief(text: str) -> Brief | None:
     return Brief(meta=meta, entries=parse_body(body))
 
 
+def _repo_root(base_dir: Path) -> Path | None:
+    """Ближайший вверх по дереву каталог с `.git` (корень репо брифа)."""
+    d = base_dir.resolve()
+    while True:
+        if (d / ".git").exists():
+            return d
+        if d.parent == d:
+            return None
+        d = d.parent
+
+
+def _resolve_ref(ref: str, base_dir: Path) -> Path | None:
+    """Разрешить путь-ссылку traces_to: сперва от брифа, затем от корня его репо (GC-16).
+
+    Абсолютные пути отбрасываются, а результат обязан остаться внутри корня репо
+    (или base_dir, если репо нет) — защита от path traversal на непроверенном контенте.
+    """
+    if Path(ref).is_absolute():
+        return None
+    root = _repo_root(base_dir)
+    bound = root if root is not None else base_dir.resolve()
+    for anchor in (base_dir, bound):
+        cand = (anchor / ref).resolve()
+        if cand.is_file() and cand.is_relative_to(bound):
+            return cand
+    return None
+
+
 def check(text: str, base_dir: Path | None = None) -> list[Finding]:
-    """Прогнать все правила GC-01…GC-14; вернуть findings (errors + warnings)."""
+    """Прогнать все правила GC-01…GC-16; вернуть findings (errors + warnings)."""
     findings: list[Finding] = []
     err = lambda rule, ref, msg: findings.append(Finding(rule, "error", ref, msg))
     warn = lambda rule, ref, msg: findings.append(Finding(rule, "warning", ref, msg))
@@ -221,21 +249,39 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
         if prefix and coverage.get(key) == "covered" and not brief.by_prefix(prefix):
             err("GC-05", f"coverage.{key}", f"заявлено covered, но записей {prefix}-NN в теле нет")
 
+    # traces_to нормализуем к списку: YAML-строка (traces_to: customer.md) — тоже валидна,
+    # иначе итерация по символам молча отключила бы GC-12/GC-16
+    raw_traces = meta.get("traces_to") or []
+    if isinstance(raw_traces, str):
+        raw_traces = [raw_traces]
+    elif not isinstance(raw_traces, list):
+        err("GC-01", "traces_to", f"ожидается список или строка, получено {type(raw_traces).__name__}")
+        raw_traces = []
+
+    # GC-16 путь-элементы traces_to разрешаются (от брифа или корня его репо)
+    path_refs = [
+        r for r in raw_traces
+        if isinstance(r, str) and r.endswith(".md") and not r.startswith("[[")
+    ]
+    if base_dir is not None:
+        for ref in path_refs:
+            if _resolve_ref(ref, base_dir) is None:
+                err("GC-16", ref, "путь из traces_to не разрешается ни от брифа, ни от корня репо")
+
     # GC-05 (engineer) feasibility_review: каждый Must-FR из upstream упомянут в теле
     upstream_meta: dict | None = None
     upstream_ref: str | None = None
     if frame_name == "engineer" and base_dir is not None:
-        for ref in meta.get("traces_to") or []:
-            if isinstance(ref, str) and ref.endswith(".md"):
-                path = (base_dir / ref).resolve()
-                if path.is_file():
-                    upstream_ref = ref
-                    upstream_meta, upstream_body = split_frontmatter(path.read_text(encoding="utf-8"))
-                    if coverage.get("feasibility_review") == "covered" and upstream_meta is not None:
-                        for entry in parse_body(upstream_body):
-                            if entry.prefix == "FR" and entry.priority() == "Must" and entry.eid not in text:
-                                err("GC-05", "coverage.feasibility_review",
-                                    f"Must-требование {entry.eid} из {ref} не получило feasibility-вердикта")
+        for ref in path_refs:
+            path = _resolve_ref(ref, base_dir)
+            if path is not None:
+                upstream_ref = ref
+                upstream_meta, upstream_body = split_frontmatter(path.read_text(encoding="utf-8"))
+                if coverage.get("feasibility_review") == "covered" and upstream_meta is not None:
+                    for entry in parse_body(upstream_body):
+                        if entry.prefix == "FR" and entry.priority() == "Must" and entry.eid not in text:
+                            err("GC-05", "coverage.feasibility_review",
+                                f"Must-требование {entry.eid} из {ref} не получило feasibility-вердикта")
                 break
 
     doc_ids = brief.ids()
@@ -311,8 +357,7 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
 
     # GC-12 engineer: upstream approved-before-downstream
     if frame_name == "engineer":
-        traces_to = meta.get("traces_to") or []
-        if not traces_to:
+        if not raw_traces:
             err("GC-12", "traces_to", "пуст: engineer-brief обязан ссылаться на customer-brief")
         elif upstream_ref is not None:
             if upstream_meta is None:
@@ -320,10 +365,8 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
             elif upstream_meta.get("status") != "approved":
                 err("GC-12", upstream_ref,
                     f"upstream status={upstream_meta.get('status')!r}, требуется 'approved'")
-        else:
-            md_refs = [r for r in traces_to if isinstance(r, str) and r.endswith(".md")]
-            if md_refs:
-                warn("GC-12", md_refs[0], "upstream-brief не резолвится — статус не проверен")
+        elif path_refs:
+            warn("GC-12", path_refs[0], "upstream-brief не резолвится — статус не проверен")
 
     # GC-13 engineer: IF → S; AP → S/CON
     if frame_name == "engineer":
@@ -341,6 +384,15 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
         for prefix in ("S", "IF", "AP"):
             for entry in brief.by_prefix(prefix):
                 warn("GC-14", entry.eid, "solution-space запись в customer-брифе")
+
+    # GC-15 validation зеркалит фактический результат линтера (считается последним)
+    declared_validation = meta.get("validation")
+    has_errors = any(f.level == "error" for f in findings)
+    if has_errors and declared_validation == "pass":
+        err("GC-15", "validation", "validation=pass при наличии ошибок линтера")
+    elif not has_errors and declared_validation != "pass":
+        err("GC-15", "validation",
+            f"ошибок нет, но validation={declared_validation!r} — протухшее зеркало (ожидается 'pass')")
 
     return findings
 

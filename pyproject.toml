@@ -1,6 +1,6 @@
 [project]
 name = "discovery-toolkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Discovery/elicitation skill bundle: discovery-brief contract v1, gate-check linter, golden fixtures"
 requires-python = ">=3.11"
 dependencies = ["pyyaml>=6"]

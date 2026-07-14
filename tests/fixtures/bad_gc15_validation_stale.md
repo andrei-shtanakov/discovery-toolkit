@@ -5,7 +5,7 @@ version: 1
 generated_by: discovery-agent@claude-fable-5
 generated_at: 2026-07-14
 source_prompt_version: sha256:0000000000000000000000000000000000000000000000000000000000000000
-validation: pass
+validation: pending
 approved_by: null
 approved_at: null
 owner_role: product
