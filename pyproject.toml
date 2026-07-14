@@ -1,0 +1,16 @@
+[project]
+name = "discovery-toolkit"
+version = "0.1.0"
+description = "Discovery/elicitation skill bundle: discovery-brief contract v1, gate-check linter, golden fixtures"
+requires-python = ">=3.11"
+dependencies = ["pyyaml>=6"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
