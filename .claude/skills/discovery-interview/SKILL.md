@@ -70,9 +70,11 @@ Gate BR/FRD (customer) или Gate 0b/0a (engineer). Ценность на 90% �
 - Каждое `FR-NN` — `traces: [G-.. | J-..]` (≥1), `Priority` (MoSCoW: 🔴 Must / 🟠 Should /
   🟡 Could / ⚪ Won't) и `Acceptance` в стиле FRD spec-runner. Каждая `M-NN` → ≥1 `G-NN`.
 
-## Шаг 4 — coverage-gate (самопроверка ДО выдачи)
+## Шаг 4 — coverage-gate (ДО выдачи)
 
-Прогони гейт из контракта §4 против required-набора фрейма (задан в frame-файле):
+**Сначала детерминированный линтер:** если доступен репо `discovery-toolkit` — прогони
+`uv run gate_check.py <файл брифа>` (правила GC-01…GC-14 из контракта §5) и исправляй до
+чистого прохода. Линтера нет — самопроверка вручную по контракту §4:
 
 ```
 gate_passed = (все required-секции присутствуют и непусты)
