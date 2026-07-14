@@ -5,7 +5,7 @@ version: 1
 generated_by: discovery-agent@claude-fable-5
 generated_at: 2026-07-14
 source_prompt_version: sha256:0000000000000000000000000000000000000000000000000000000000000000
-validation: pass
+validation: fail
 approved_by: null
 approved_at: null
 owner_role: product
@@ -33,7 +33,7 @@ coverage:
 open_questions: 2
 blocking_open_questions: 0
 conflicts: 0
-traces_to: []
+traces_to: [no/such/file.md]
 ---
 
 # Discovery Brief — dispatcher (ecosystem observability)

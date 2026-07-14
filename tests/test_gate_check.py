@@ -38,6 +38,8 @@ def test_good_fixture_passes(name):
         ("bad_gc10_counter_mismatch.md", "GC-10"),
         ("bad_gc11_blocking_gate.md", "GC-11"),
         ("bad_gc12_upstream_draft.md", "GC-12"),
+        ("bad_gc15_validation_stale.md", "GC-15"),
+        ("bad_gc16_unresolvable_traces.md", "GC-16"),
     ],
 )
 def test_bad_fixture_fails_exactly_its_rule(name, expected_rule):
@@ -57,12 +59,12 @@ def test_gc14_solution_space_leak_is_warning_not_error():
     assert any(f.rule == "GC-14" and f.level == "warning" for f in findings)
 
 
-def test_gc12_unresolvable_upstream_is_warning():
+def test_unresolvable_upstream_is_gc16_error_plus_gc12_warning():
     text = (FIXTURES / "engineer_good.md").read_text(encoding="utf-8").replace(
         "traces_to: [customer_approved.md]", "traces_to: [no/such/brief.md]"
-    )
+    ).replace("validation: pass", "validation: fail")
     findings = check(text, base_dir=FIXTURES)
-    assert errors(findings) == []
+    assert {f.rule for f in errors(findings)} == {"GC-16"}, [str(f) for f in findings]
     assert any(f.rule == "GC-12" and f.level == "warning" for f in findings)
 
 

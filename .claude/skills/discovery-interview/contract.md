@@ -1,12 +1,12 @@
-> **Vendored pin** — копия канонического контракта `DISCOVERY-BRIEF-CONTRACT.md` (v1,
-> корень репо discovery-toolkit), скопирована 2026-07-14, sha256: 1043adae55c66bd9c2ab186255d92a70b667844b6202279bf62efb054eb1be72.
+> **Vendored pin** — копия канонического контракта `DISCOVERY-BRIEF-CONTRACT.md` (v1.1,
+> корень репо discovery-toolkit), скопирована 2026-07-14, sha256: 082346bed016d996bf9df13bf3379efb918d7e1c261c0648f61effe795638c60.
 > Skill читает только эту копию (самодостаточность при установке в другие проекты).
 > Синхронность с каноном проверяет tests/test_contract_sync.py — при правке канона
 > перегенерируй копию и хеш.
 
-# Discovery Brief — контракт выходного артефакта интервьюера (v1)
+# Discovery Brief — контракт выходного артефакта интервьюера (v1.1)
 
-> Дата заморозки: 2026-07-14 · Статус: **Frozen (v1)** · Канон: этот файл
+> Дата заморозки: 2026-07-14 (v1) · Правки v1.1: 2026-07-14 · Статус: **Frozen (v1.1)** · Канон: этот файл
 > (репо `discovery-toolkit`; черновик v0.1 остаётся в
 > `_cowork_output/contracts/2026-07-13-discovery-brief-contract-v0.1.md` как история).
 > Владелец: discovery-agent (авторит) · Потребитель: governance-слой (Gate BR/FRD/0b/0a)
@@ -24,6 +24,16 @@
 | `out_of_scope` в coverage | Добавлен required-ключом customer-фрейма (в v0.1 секция OUT была required, но ключа не было — рассинхрон закрыт). |
 | Приватность `interview.sessions` | Нормативно: **роли, не имена** по умолчанию; имя — только с явного согласия участника. |
 | Семантика счётчика `conflicts` | Уточнено: число `X-NN` со `status: open` (resolved остаются в теле для истории, счётчик — только открытые). |
+
+## Изменения v1.1 (по итогам первых двух реальных прогонов и ревью Copilot)
+
+- **GC-15**: `validation` обязан зеркалить фактический результат линтера (ловит
+  протухшее `pending` при чистом брифе и лживое `pass` при ошибках).
+- **GC-16**: путь-элементы `traces_to` обязаны разрешаться — относительно брифа или
+  корня его git-репо (ловит ссылки, умершие при переносе брифа в целевой репо).
+- **Формат §2**: жирный ID зарезервирован за определениями; ссылки на ID (включая
+  upstream-требования в feasibility-секции engineer-брифа) — без болда, иначе линтер
+  читает их как определения. Схема брифа не менялась — `schema_version` остаётся 1.
 
 ## TL;DR
 
@@ -52,7 +62,7 @@ version: 1
 generated_by: discovery-agent@claude-fable-5    # agent-id автора (<harness>@<model>)
 generated_at: 2026-07-14
 source_prompt_version: sha256:<хеш frames/<frame>.md>   # версия банка вопросов фрейма
-validation: pending
+validation: pass                 # зеркало результата gate_check (GC-15): pass только при 0 ошибок
 approved_by: null                # actor/agent-id, записавший аппрув
 approved_at: null
 owner_role: product              # CODEOWNERS-роль (customer → product, engineer → architect)
@@ -108,6 +118,8 @@ traces_to: []                    # upstream: KB prograph-vault, approved custome
 
 - Запись = либо буллет `- **G-01** текст`, либо заголовок `#### FR-01: Название`.
   Метаданные записи — строки её блока (до следующей записи/заголовка).
+- Жирный ID — **только для определений**. Ссылки на ID (в т.ч. на требования upstream-
+  брифа в feasibility-секции engineer-фрейма) пишутся без болда: `FR-01`, не `**FR-01**`.
 - Трассировка: `` `traces: [G-01, J-02]` `` — на строке заголовка записи или внутри блока.
 - `FR`: строка `**Priority**: 🔴 Must | 🟠 Should | 🟡 Could | ⚪ Won't` и строка
   `**Acceptance**: …`. `NFR`: строка `**Acceptance**: …` или `**Target**: …`
@@ -178,9 +190,11 @@ gate_passed = ( все required-ключи фрейма = covered, и их се�
 | GC-09 | error | каждый `Q-NN`: `owner_role` + `blocking`; каждый `X-NN`: `status ∈ {open, resolved}` |
 | GC-10 | error | счётчики frontmatter = фактам тела (`open_questions`, `blocking_open_questions`, `conflicts`) |
 | GC-11 | error | `gate_passed` в frontmatter = вычисленному по формуле §4 |
-| GC-12 | error/warning | engineer: `traces_to` непуст; upstream-brief резолвится ⇒ его `status: approved` (error); не резолвится ⇒ warning |
+| GC-12 | error/warning | engineer: `traces_to` непуст (error); найденный upstream-brief — `status: approved` (error); upstream не найден ⇒ warning (нерезолвящиеся пути ловит GC-16) |
 | GC-13 | error | engineer: каждое `IF` → существующий `S`; каждое `AP` → `S`/`CON` |
 | GC-14 | warning | customer: записи `S/IF/AP` в customer-брифе — solution-space протёк в problem-space |
+| GC-15 | error | `validation` зеркалит линтер: `pass` допустим только при 0 ошибок; 0 ошибок при `pending`/пустом — протухшее зеркало |
+| GC-16 | error | каждый путь-элемент `traces_to` (`*.md`) разрешается относительно брифа или корня его git-репо |
 
 ---
 
