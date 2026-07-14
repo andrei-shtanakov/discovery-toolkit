@@ -68,6 +68,22 @@ def test_unresolvable_upstream_is_gc16_error_plus_gc12_warning():
     assert any(f.rule == "GC-12" and f.level == "warning" for f in findings)
 
 
+def test_traces_to_as_yaml_string_is_normalized():
+    text = (FIXTURES / "engineer_good.md").read_text(encoding="utf-8").replace(
+        "traces_to:\n  - discovery-brief-customer.md", "traces_to: customer_approved.md"
+    ).replace("traces_to: [customer_approved.md]", "traces_to: customer_approved.md")
+    findings = check(text, base_dir=FIXTURES)
+    assert errors(findings) == [], [str(f) for f in findings]
+
+
+def test_traversal_and_absolute_refs_rejected():
+    from gate_check import _resolve_ref
+
+    assert _resolve_ref("/etc/hosts", FIXTURES) is None
+    escape = "../" * 8 + "etc/hosts"
+    assert _resolve_ref(escape, FIXTURES) is None
+
+
 def test_missing_frontmatter_is_gc01():
     findings = check("# просто markdown без frontmatter\n")
     assert [f.rule for f in findings] == ["GC-01"]

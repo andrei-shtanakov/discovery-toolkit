@@ -1,6 +1,6 @@
-"""gate_check — линтер discovery-brief по контракту DISCOVERY-BRIEF-CONTRACT.md (v1).
+"""gate_check — линтер discovery-brief по контракту DISCOVERY-BRIEF-CONTRACT.md (v1.1).
 
-Правила GC-01…GC-14 — нормативный реестр в контракте §5. Каждое finding несёт ID
+Правила GC-01…GC-16 — нормативный реестр в контракте §5. Каждое finding несёт ID
 правила; выход 1, если есть хотя бы одна ошибка.
 
 Запуск: uv run gate_check.py <brief.md> [<brief2.md> ...]
@@ -178,20 +178,24 @@ def _repo_root(base_dir: Path) -> Path | None:
 
 
 def _resolve_ref(ref: str, base_dir: Path) -> Path | None:
-    """Разрешить путь-ссылку traces_to: сперва от брифа, затем от корня его репо (GC-16)."""
-    cand = (base_dir / ref).resolve()
-    if cand.is_file():
-        return cand
+    """Разрешить путь-ссылку traces_to: сперва от брифа, затем от корня его репо (GC-16).
+
+    Абсолютные пути отбрасываются, а результат обязан остаться внутри корня репо
+    (или base_dir, если репо нет) — защита от path traversal на непроверенном контенте.
+    """
+    if Path(ref).is_absolute():
+        return None
     root = _repo_root(base_dir)
-    if root is not None:
-        cand = (root / ref).resolve()
-        if cand.is_file():
+    bound = root if root is not None else base_dir.resolve()
+    for anchor in (base_dir, bound):
+        cand = (anchor / ref).resolve()
+        if cand.is_file() and cand.is_relative_to(bound):
             return cand
     return None
 
 
 def check(text: str, base_dir: Path | None = None) -> list[Finding]:
-    """Прогнать все правила GC-01…GC-14; вернуть findings (errors + warnings)."""
+    """Прогнать все правила GC-01…GC-16; вернуть findings (errors + warnings)."""
     findings: list[Finding] = []
     err = lambda rule, ref, msg: findings.append(Finding(rule, "error", ref, msg))
     warn = lambda rule, ref, msg: findings.append(Finding(rule, "warning", ref, msg))
@@ -245,9 +249,18 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
         if prefix and coverage.get(key) == "covered" and not brief.by_prefix(prefix):
             err("GC-05", f"coverage.{key}", f"заявлено covered, но записей {prefix}-NN в теле нет")
 
+    # traces_to нормализуем к списку: YAML-строка (traces_to: customer.md) — тоже валидна,
+    # иначе итерация по символам молча отключила бы GC-12/GC-16
+    raw_traces = meta.get("traces_to") or []
+    if isinstance(raw_traces, str):
+        raw_traces = [raw_traces]
+    elif not isinstance(raw_traces, list):
+        err("GC-01", "traces_to", f"ожидается список или строка, получено {type(raw_traces).__name__}")
+        raw_traces = []
+
     # GC-16 путь-элементы traces_to разрешаются (от брифа или корня его репо)
     path_refs = [
-        r for r in meta.get("traces_to") or []
+        r for r in raw_traces
         if isinstance(r, str) and r.endswith(".md") and not r.startswith("[[")
     ]
     if base_dir is not None:
@@ -344,8 +357,7 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
 
     # GC-12 engineer: upstream approved-before-downstream
     if frame_name == "engineer":
-        traces_to = meta.get("traces_to") or []
-        if not traces_to:
+        if not raw_traces:
             err("GC-12", "traces_to", "пуст: engineer-brief обязан ссылаться на customer-brief")
         elif upstream_ref is not None:
             if upstream_meta is None:
@@ -378,7 +390,7 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
     has_errors = any(f.level == "error" for f in findings)
     if has_errors and declared_validation == "pass":
         err("GC-15", "validation", "validation=pass при наличии ошибок линтера")
-    elif not has_errors and declared_validation not in ("pass", "warn"):
+    elif not has_errors and declared_validation != "pass":
         err("GC-15", "validation",
             f"ошибок нет, но validation={declared_validation!r} — протухшее зеркало (ожидается 'pass')")
 
