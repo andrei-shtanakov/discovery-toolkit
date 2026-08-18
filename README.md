@@ -19,6 +19,7 @@ tests/
   fixtures/                   # golden: customer_good/approved, engineer_good; bad_gcNN_* — по правилу на файл
   test_gate_check.py          # L0 (SpecMeta unknown-keys) + L1 (gate-check против фикстур)
   test_contract_sync.py       # копия контракта в skill не разъехалась с каноном
+  test_frames_markers.py      # банк вопросов фреймов полон относительно coverage-гейта
 ```
 
 ## Использование
