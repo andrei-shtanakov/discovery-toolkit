@@ -106,3 +106,54 @@ def test_specmeta_core_present_and_extension_is_unknown_keys(name):
     # discovery-специфика едет ТОЛЬКО unknown-keys (meta_from_dict их игнорирует)
     extension = set(brief.meta) - SPECMETA_V1_FIELDS
     assert {"schema", "schema_version", "interview", "coverage"} <= extension
+
+
+# --- L1: чужой ввод — форма frontmatter произвольна, линтер тотален (issue #18) --
+
+def customer_with(replacements: dict[str, str]) -> str:
+    text = (FIXTURES / "customer_good.md").read_text(encoding="utf-8")
+    for old, new in replacements.items():
+        assert old in text, f"фикстура не содержит {old!r}"
+        text = text.replace(old, new)
+    return text
+
+
+def test_interview_scalar_is_gc03_error_not_crash():
+    meta_head = customer_with({}).split("\n---", 1)[0]
+    interview_block = meta_head[meta_head.index("interview:"):]
+    interview_block = interview_block[: interview_block.index("\ncoverage:")]
+    text = customer_with({interview_block: "interview: customer"})
+    findings = check(text, base_dir=FIXTURES)
+    assert any(f.rule == "GC-03" and f.ref == "interview" for f in errors(findings)), [
+        str(f) for f in findings
+    ]
+
+
+def test_coverage_scalar_is_gc04_error_not_crash():
+    meta_head = customer_with({}).split("\n---", 1)[0]
+    coverage_block = meta_head[meta_head.index("coverage:"):]
+    coverage_block = coverage_block[: coverage_block.index("\ntraces_to:")]
+    text = customer_with({coverage_block: "coverage: everything"})
+    findings = check(text, base_dir=FIXTURES)
+    assert any(f.rule == "GC-04" and f.ref == "coverage" for f in errors(findings)), [
+        str(f) for f in findings
+    ]
+
+
+def test_sessions_scalar_is_single_gc03_error():
+    meta_head = customer_with({}).split("\n---", 1)[0]
+    sessions_block = meta_head[meta_head.index("  sessions:"):]
+    sessions_block = sessions_block[: sessions_block.index("\ncoverage:")]
+    text = customer_with({sessions_block: "  sessions: interviewed"})
+    gc03 = [f for f in errors(check(text, base_dir=FIXTURES)) if f.rule == "GC-03"]
+    assert [f.ref for f in gc03] == ["interview.sessions"], [str(f) for f in gc03]
+
+
+def test_unhashable_frame_and_coverage_values_do_not_crash():
+    text = customer_with({"  frame: customer": "  frame: [customer]"})
+    findings = check(text, base_dir=FIXTURES)
+    assert any(f.rule == "GC-03" and f.ref == "interview.frame" for f in errors(findings))
+
+    text = customer_with({"  goals: covered": "  goals: [covered]"})
+    findings = check(text, base_dir=FIXTURES)
+    assert any(f.rule == "GC-04" and f.ref == "coverage.goals" for f in errors(findings))
