@@ -202,8 +202,12 @@ def _type_msg(expected: str, value: object) -> str:
 def check(text: str, base_dir: Path | None = None) -> list[Finding]:
     """Прогнать все правила GC-01…GC-16; вернуть findings (errors + warnings)."""
     findings: list[Finding] = []
-    err = lambda rule, ref, msg: findings.append(Finding(rule, "error", ref, msg))
-    warn = lambda rule, ref, msg: findings.append(Finding(rule, "warning", ref, msg))
+
+    def err(rule: str, ref: str, msg: str) -> None:
+        findings.append(Finding(rule, "error", ref, msg))
+
+    def warn(rule: str, ref: str, msg: str) -> None:
+        findings.append(Finding(rule, "warning", ref, msg))
 
     brief = parse_brief(text)
     if brief is None:
