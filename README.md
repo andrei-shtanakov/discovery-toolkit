@@ -9,7 +9,7 @@ robin-toolkit; stateful-runtime — отдельный будущий репо `
 
 ```
 DISCOVERY-BRIEF-CONTRACT.md   # КАНОН: контракт discovery-brief v1 (frozen 2026-07-14)
-gate_check.py                 # линтер брифов: правила GC-01…GC-14 из контракта §5
+gate_check.py                 # линтер брифов: правила GC-01…GC-17 из контракта §5
 .claude/skills/discovery-interview/
   SKILL.md                    # оркестрация: фрейм → grounding → интервью → coverage-gate → выдача
   frames/customer.md          # problem-space: банк вопросов, чек-листы, запрет вопросов про архитектуру

@@ -7,3 +7,8 @@
       frontmatter: не-мэппинг в `interview`/`coverage`, не-список в `sessions`,
       нехешируемые `frame`/значения coverage → finding GC-03/GC-04, не исключение
       (issue #18, from: discovery#49).
+- [ ] `slug: preference-constraint-translation` — контракт v1.2: Preference → гипотеза → `Q-NN` исследования (GC-17), `> ` для инструкций в банке @owner:github:andrei-shtanakov @id:preference-constraint-translation
+      Подробно: `**Preference**` дословно,
+      гипотеза-ограничение в Acceptance/Target, число — `Q-NN` исследования (GC-17);
+      в банке `- ` — вопрос человеку, `> ` — инструкция составителю
+      (issue #28, from: discovery#71).

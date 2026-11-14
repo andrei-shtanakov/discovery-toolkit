@@ -40,6 +40,7 @@ def test_good_fixture_passes(name):
         ("bad_gc12_upstream_draft.md", "GC-12"),
         ("bad_gc15_validation_stale.md", "GC-15"),
         ("bad_gc16_unresolvable_traces.md", "GC-16"),
+        ("bad_gc17_dangling_research_ref.md", "GC-17"),
     ],
 )
 def test_bad_fixture_fails_exactly_its_rule(name, expected_rule):
@@ -157,3 +158,45 @@ def test_unhashable_frame_and_coverage_values_do_not_crash():
     text = customer_with({"  goals: covered": "  goals: [covered]"})
     findings = check(text, base_dir=FIXTURES)
     assert any(f.rule == "GC-04" and f.ref == "coverage.goals" for f in errors(findings))
+
+
+# --- L1: предпочтение → гипотеза → число как Q-NN исследования (v1.2, issue #28) --
+
+RESEARCH_NFR = (
+    "**Preference**: «чтобы обновлялось мгновенно»\n"
+    "**Category**: perf · **Target**: полный refresh не дольше значения из Q-02."
+)
+NFR_02_TARGET = "**Category**: perf · **Target**: полный refresh < 5 c на 15 репо."
+
+
+def test_research_ref_to_open_q_passes():
+    """Preference + гипотеза со ссылкой на открытый Q — полная запись, ошибок нет."""
+    findings = check(customer_with({NFR_02_TARGET: RESEARCH_NFR}), base_dir=FIXTURES)
+    assert errors(findings) == [], [str(f) for f in findings]
+    assert not [f for f in findings if f.rule == "GC-17"]
+
+
+def test_research_ref_to_resolved_q_is_warning():
+    """Q закрыт — число найдено, ссылку пора заменить значением: warning, не error."""
+    text = customer_with(
+        {
+            NFR_02_TARGET: RESEARCH_NFR,
+            "`blocking: false` — нужен ли web-UI": "`blocking: false` · `resolved: true` — нужен ли web-UI",
+            "open_questions: 2": "open_questions: 1",
+        }
+    )
+    findings = check(text, base_dir=FIXTURES)
+    assert errors(findings) == [], [str(f) for f in findings]
+    assert any(f.rule == "GC-17" and f.level == "warning" and f.ref == "NFR-02" for f in findings)
+
+
+def test_research_ref_in_fr_acceptance_and_metric_is_checked():
+    """GC-17 смотрит FR, NFR и M одинаково."""
+    text = customer_with(
+        {
+            "**Acceptance**: экран-сводка": "**Acceptance**: по Q-07; экран-сводка",
+            "минуты ручного обхода → < 30 c.": "baseline из Q-08 → < 30 c.",
+        }
+    )
+    refs = {f.ref for f in errors(check(text, base_dir=FIXTURES)) if f.rule == "GC-17"}
+    assert refs == {"FR-02", "M-01"}
