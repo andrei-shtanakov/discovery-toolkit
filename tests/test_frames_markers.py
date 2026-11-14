@@ -79,3 +79,32 @@ def test_topic_produces_its_section_prefix(frame):
         assert prefix in produces, (
             f"{frame}/«{heading}»: ключ {key} — секция {prefix}, но produces={produces}"
         )
+
+
+_ID_TEMPLATE_RE = re.compile(r"`[A-Z]+-NN`")
+
+
+def question_bullets(frame: str) -> list[str]:
+    """Пункты-вопросы банка: `- `-строки с продолжениями (как читает runtime)."""
+    lines = (FRAMES_DIR / f"{frame}.md").read_text(encoding="utf-8").splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(BANK_HEADING))
+    bullets: list[str] = []
+    for line in lines[start + 1 :]:
+        if line.startswith("## "):
+            break
+        if line.startswith("- "):
+            bullets.append(line[2:])
+        elif line.startswith("  ") and line.strip() and bullets:
+            bullets[-1] += " " + line.strip()
+    return bullets
+
+
+@pytest.mark.parametrize("frame", sorted(FRAMES))
+def test_question_bullets_are_not_composer_instructions(frame):
+    """`- ` — вопрос человеку; инструкция составителю (куда писать `X-NN`/`Q-NN`) — `> `.
+
+    Runtime превращает каждый `- `-пункт темы в вопрос стейкхолдеру; шаблон ID в нём
+    значит, что составителю адресованное ушло человеку (discovery#71).
+    """
+    leaked = [b for b in question_bullets(frame) if _ID_TEMPLATE_RE.search(b)]
+    assert not leaked, f"{frame}: инструкции под видом вопросов: {leaked}"
