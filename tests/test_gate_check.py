@@ -41,6 +41,10 @@ def test_good_fixture_passes(name):
         ("bad_gc15_validation_stale.md", "GC-15"),
         ("bad_gc16_unresolvable_traces.md", "GC-16"),
         ("bad_gc17_dangling_research_ref.md", "GC-17"),
+        ("bad_gc18_assumption_unconfirmed.md", "GC-18"),
+        ("bad_gc19_category_missing.md", "GC-19"),
+        ("bad_gc20_perf_without_number.md", "GC-20"),
+        ("bad_gc21_owner_missing.md", "GC-21"),
     ],
 )
 def test_bad_fixture_fails_exactly_its_rule(name, expected_rule):
@@ -200,3 +204,70 @@ def test_research_ref_in_fr_acceptance_and_metric_is_checked():
     )
     refs = {f.ref for f in errors(check(text, base_dir=FIXTURES)) if f.rule == "GC-17"}
     assert refs == {"FR-02", "M-01"}
+
+
+# --- L1: enterprise-фрейм заказчика — translation table и владельцы (v1.3, issue #30) --
+
+STOIT_ROW = (
+    "| «обновляться должно быстро» | стоить | NFR-02 | «быстро» = полный refresh до 5 с "
+    "| ecosystem-tpm | 2026-07-20 |"
+)
+
+
+def gc_errors(text: str, rule: str) -> list[str]:
+    return [f.message for f in errors(check(text, base_dir=FIXTURES)) if f.rule == rule]
+
+
+def test_gc18_missing_table_is_single_error():
+    text = customer_with({"## Translation table": "## Заметки"})
+    assert gc_errors(text, "GC-18") == ["секции нет или в ней нет строк"]
+    assert gc_errors(text, "GC-19") == []  # без таблицы категории не считаются
+
+
+@pytest.mark.parametrize(
+    ("row", "fragment"),
+    [
+        (STOIT_ROW.replace("NFR-02", "NFR-09"), "NFR-09"),
+        (STOIT_ROW.replace("NFR-02", "G-01"), "G-01"),
+        (STOIT_ROW.replace("NFR-02", "быстрый отклик"), "не ссылается на ID"),
+        (STOIT_ROW.replace("| стоить |", "| скорость |"), "вне словаря"),
+        (STOIT_ROW.replace("«обновляться должно быстро»", "—"), "нет слов заказчика"),
+        (STOIT_ROW.replace(" | 2026-07-20 |", " |"), "колонок"),
+    ],
+)
+def test_gc18_row_defects(row, fragment):
+    messages = gc_errors(customer_with({STOIT_ROW: row}), "GC-18")
+    assert any(fragment in m for m in messages), messages
+
+
+@pytest.mark.parametrize(
+    "target",
+    ["p95 до 2 с", "до 500 запросов/день", "95%", "$300 в месяц", "не хуже значения из Q-02"],
+)
+def test_gc20_accepts_number_with_unit_or_research_ref(target):
+    text = customer_with(
+        {"**Target**: полный refresh < 5 c на 15 репо.": f"**Target**: {target}."}
+    )
+    assert gc_errors(text, "GC-20") == []
+
+
+def test_gc20_ignores_non_numeric_categories():
+    """safety-цель без числа легитимна: «0 записей» не обязана быть метрикой."""
+    text = customer_with({"**Category**: safety · **Target**: 0 записей": "**Category**: safety · **Target**: ни одной записи"})
+    assert gc_errors(text, "GC-20") == []
+
+
+def test_gc21_owner_may_be_open_question():
+    """Владелец не назван — открытый Q с тем же owns закрывает GC-21."""
+    text = customer_with(
+        {
+            " `owns: data`": "",
+            "`blocking: false` — нужен ли web-UI": "`blocking: false` · `owns: data` — нужен ли web-UI",
+        }
+    )
+    assert gc_errors(text, "GC-21") == []
+
+
+def test_enterprise_rules_do_not_apply_to_engineer_frame():
+    findings = run("engineer_good.md")
+    assert not {f.rule for f in findings} & {"GC-18", "GC-19", "GC-20", "GC-21"}
