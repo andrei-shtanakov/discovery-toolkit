@@ -12,7 +12,7 @@
       гипотеза-ограничение в Acceptance/Target, число — `Q-NN` исследования (GC-17);
       в банке `- ` — вопрос человеку, `> ` — инструкция составителю
       (issue #28, from: discovery#71).
-- [ ] `slug: customer-frame-enterprise-questionnaire` — контракт v1.3: банк customer = опросник владельца (9 блоков на прежних coverage-ключах), `## Translation table` как итог discovery, критерии «Discovery завершён» → GC-18…GC-21 @owner:github:andrei-shtanakov @id:customer-frame-enterprise-questionnaire
+- [x] `slug: customer-frame-enterprise-questionnaire` — контракт v1.3: банк customer = опросник владельца (9 блоков на прежних coverage-ключах), `## Translation table` как итог discovery, критерии «Discovery завершён» → GC-18…GC-21 (PR #31) @owner:github:andrei-shtanakov @id:customer-frame-enterprise-questionnaire
       Подробно: колонки «архитектурное решение» нет — вывод в `Q-NN` для architect;
       механические критерии — error (таблица, допущения с подтверждающим и сроком,
       четыре категории, perf/cost числом с единицей, владельцы `owns:`), семантические —
