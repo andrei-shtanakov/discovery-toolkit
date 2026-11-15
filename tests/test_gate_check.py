@@ -242,7 +242,15 @@ def test_gc18_row_defects(row, fragment):
 
 @pytest.mark.parametrize(
     "target",
-    ["p95 до 2 с", "до 500 запросов/день", "95%", "$300 в месяц", "не хуже значения из Q-02"],
+    [
+        "p95 до 2 с",
+        "до 500 запросов/день",
+        "95%",
+        "$300 в месяц",
+        "не более 40 000 ₽ в месяц",
+        "до 20 °C",
+        "не хуже значения из Q-02",
+    ],
 )
 def test_gc20_accepts_number_with_unit_or_research_ref(target):
     text = customer_with(
@@ -276,7 +284,7 @@ def test_enterprise_rules_do_not_apply_to_engineer_frame():
 def test_gc20_nfr_without_category_is_error():
     """Отсутствие Category не выключает GC-20 (ревью PR #31)."""
     text = customer_with({"**Category**: perf · **Target**: полный": "**Target**: полный"})
-    assert gc_errors(text, "GC-20") == ["нет **Category**: без неё perf/cost-цель не проверить"]
+    assert "нет **Category**: без неё perf/cost-цель не проверить" in gc_errors(text, "GC-20")
 
 
 def test_gc20_multiple_categories_include_perf():
@@ -308,3 +316,9 @@ def test_gc21_resolved_question_does_not_name_owner():
         }
     )
     assert gc_errors(text, "GC-21") == ["владелец не назван: нет P или открытого Q с этим owns"]
+
+
+def test_gc20_requires_perf_and_cost_targets_to_exist():
+    """Пункт чек-листа «латентность, объём, бюджет числами» не закрывается пустотой."""
+    text = customer_with({"**Category**: cost ·": "**Category**: safety ·"})
+    assert gc_errors(text, "GC-20") == ["нет ни одной NFR категории cost"]

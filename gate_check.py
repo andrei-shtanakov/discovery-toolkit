@@ -69,8 +69,8 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TARGET_RE = re.compile(r"\*\*(?:Acceptance[\w ]*|Target)\*\*:\s*(.+)")
 _CATEGORY_RE = re.compile(r"\*\*Category\*\*:\s*([\w|, -]+)")
 _OWNS_RE = re.compile(r"owns:\s*([a-z][a-z, ]*)")
-# число с единицей: «2 с», «500 запросов/день», «95%», «$300», «€ 40»
-_NUMBER_UNIT_RE = re.compile(r"\d[\d.,]*\s*(?:%|[^\W\d_])|[$€₽]\s*\d")
+# число с единицей: «2 с», «500 запросов/день», «95%», «40 000 ₽», «$300», «€ 40»
+_NUMBER_UNIT_RE = re.compile(r"\d[\d.,]*\s*(?:[%$€₽£°]|[^\W\d_])|[$€₽£]\s*\d")
 
 
 @dataclass
@@ -286,7 +286,10 @@ def check_translation_table(brief: Brief, err: Report) -> None:
 
 
 def check_numeric_targets(brief: Brief, err: Report) -> None:
-    """GC-20: у NFR есть Category; perf/cost — число с единицей либо ссылка на Q-NN."""
+    """GC-20: у NFR есть Category; perf/cost есть и числом с единицей либо Q-NN."""
+    present = set().union(*(e.categories() for e in brief.by_prefix("NFR")))
+    for category in sorted(NUMERIC_CATEGORIES - present):
+        err("GC-20", f"Category: {category}", f"нет ни одной NFR категории {category}")
     for entry in brief.by_prefix("NFR"):
         categories = entry.categories()
         if not categories:
