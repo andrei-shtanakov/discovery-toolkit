@@ -69,6 +69,14 @@ def test_every_required_key_has_a_topic(frame):
 
 
 @pytest.mark.parametrize("frame", sorted(FRAMES))
+def test_every_optional_key_has_a_topic(frame):
+    """Optional-ключ без темы недостижим через банк: `partial`/`missing` не дозадать."""
+    claimed = {key for _, key, _ in topics(frame)}
+    missing = set(FRAMES[frame]["optional"]) - claimed
+    assert not missing, f"{frame}: optional-ключи без темы в банке: {sorted(missing)}"
+
+
+@pytest.mark.parametrize("frame", sorted(FRAMES))
 def test_topic_produces_its_section_prefix(frame):
     """Тема ключа с секцией обязана порождать префикс этой секции (банк ⇄ контракт)."""
     sections = {**FRAMES[frame]["required"], **FRAMES[frame]["optional"]}
