@@ -329,3 +329,30 @@ def test_gc18_row_without_leading_pipe_is_still_checked():
     row = STOIT_ROW.replace("NFR-02", "NFR-99")
     messages = gc_errors(customer_with({STOIT_ROW: row.lstrip("| ")}), "GC-18")
     assert any("NFR-99" in m for m in messages), messages
+
+
+HEADER_ROW = "| Слова заказчика | Категория | Ограничение | Допущение | Подтверждает | Срок |"
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        HEADER_ROW.replace("| Категория | Ограничение |", "| Ограничение | Категория |"),
+        "| «за один экран вижу» | делать | FR-01 | — | — | — |",  # данные вместо заголовка
+    ],
+)
+def test_gc18_header_must_match_contract_columns(header):
+    """Колонки читаются по позиции — чужой заголовок не пропускается (issue #32)."""
+    messages = gc_errors(customer_with({HEADER_ROW: header}), "GC-18")
+    assert len(messages) == 1 and "заголовок" in messages[0], messages
+
+
+def test_gc18_header_is_case_insensitive():
+    assert gc_errors(customer_with({HEADER_ROW: HEADER_ROW.lower()}), "GC-18") == []
+
+
+def test_gc18_header_only_table_is_empty():
+    table_rows = customer_with({}).split(HEADER_ROW + "\n|---|---|---|---|---|---|\n")[1]
+    data = table_rows.split("\n\n## ")[0] + "\n"
+    messages = gc_errors(customer_with({data: ""}), "GC-18")
+    assert messages == ["секции нет или в ней нет строк"], messages
