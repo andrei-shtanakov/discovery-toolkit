@@ -8,11 +8,11 @@ robin-toolkit; stateful-runtime — отдельный будущий репо `
 ## Состав
 
 ```
-DISCOVERY-BRIEF-CONTRACT.md   # КАНОН: контракт discovery-brief v1 (frozen 2026-07-14)
-gate_check.py                 # линтер брифов: правила GC-01…GC-17 из контракта §5
+DISCOVERY-BRIEF-CONTRACT.md   # КАНОН: контракт discovery-brief v1.3 (frozen 2026-11-15)
+gate_check.py                 # линтер брифов: правила GC-01…GC-21 из контракта §5
 .claude/skills/discovery-interview/
   SKILL.md                    # оркестрация: фрейм → grounding → интервью → coverage-gate → выдача
-  frames/customer.md          # problem-space: банк вопросов, чек-листы, запрет вопросов про архитектуру
+  frames/customer.md          # problem-space (enterprise): опросник из 9 блоков, translation table, критерии завершения
   frames/engineer.md          # solution-space: банк вопросов, feasibility-проход, запрет пересбора целей
   contract.md                 # пиненая копия канона (самодостаточность skill'а; синк проверяется тестом)
 tests/
