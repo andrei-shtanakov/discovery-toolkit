@@ -322,3 +322,10 @@ def test_gc20_requires_perf_and_cost_targets_to_exist():
     """Пункт чек-листа «латентность, объём, бюджет числами» не закрывается пустотой."""
     text = customer_with({"**Category**: cost ·": "**Category**: safety ·"})
     assert gc_errors(text, "GC-20") == ["нет ни одной NFR категории cost"]
+
+
+def test_gc18_row_without_leading_pipe_is_still_checked():
+    """GFM-строка без ведущей трубы не выпадает из проверки (fail-closed)."""
+    row = STOIT_ROW.replace("NFR-02", "NFR-99")
+    messages = gc_errors(customer_with({STOIT_ROW: row.lstrip("| ")}), "GC-18")
+    assert any("NFR-99" in m for m in messages), messages

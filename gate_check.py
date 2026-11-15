@@ -238,10 +238,10 @@ def translation_rows(body: str) -> list[list[str]] | None:
     for line in lines[start + 1 :]:
         if _HEADING_RE.match(line):
             break
-        if not line.strip().startswith("|"):
+        if "|" not in line:  # GFM допускает строку таблицы без ведущей трубы
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if all(set(c) <= set("-: ") for c in cells):  # разделитель |---|---|
+        if all(set(c) <= set("-: ") for c in cells) and "-" in line:  # |---|---|
             continue
         rows.append(cells)
     return rows[1:]  # первая строка — заголовок колонок
