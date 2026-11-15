@@ -67,7 +67,7 @@ NUMERIC_CATEGORIES = {"perf", "cost"}
 _EMPTY_CELL = {"", "—", "-"}
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TARGET_RE = re.compile(r"\*\*(?:Acceptance[\w ]*|Target)\*\*:\s*(.+)")
-_CATEGORY_RE = re.compile(r"\*\*Category\*\*:\s*([\w-]+)")
+_CATEGORY_RE = re.compile(r"\*\*Category\*\*:\s*([\w|, -]+)")
 _OWNS_RE = re.compile(r"owns:\s*([a-z][a-z, ]*)")
 # число с единицей: «2 с», «500 запросов/день», «95%», «$300», «€ 40»
 _NUMBER_UNIT_RE = re.compile(r"\d[\d.,]*\s*(?:%|[^\W\d_])|[$€₽]\s*\d")
@@ -117,9 +117,11 @@ class Entry:
     def resolved(self) -> bool:
         return bool(re.search(r"resolved:\s*true", self.text))
 
-    def category(self) -> str | None:
+    def categories(self) -> set[str]:
         m = _CATEGORY_RE.search(self.text)
-        return m.group(1).lower() if m else None
+        if not m:
+            return set()
+        return {c.strip().lower() for c in re.split(r"[|,]", m.group(1)) if c.strip()}
 
     def owns(self) -> set[str]:
         return {
@@ -284,23 +286,29 @@ def check_translation_table(brief: Brief, err: Report) -> None:
 
 
 def check_numeric_targets(brief: Brief, err: Report) -> None:
-    """GC-20: NFR категории perf/cost — число с единицей либо ссылка на Q-NN."""
+    """GC-20: у NFR есть Category; perf/cost — число с единицей либо ссылка на Q-NN."""
     for entry in brief.by_prefix("NFR"):
-        if entry.category() not in NUMERIC_CATEGORIES:
+        categories = entry.categories()
+        if not categories:
+            err("GC-20", entry.eid, "нет **Category**: без неё perf/cost-цель не проверить")
+            continue
+        if not categories & NUMERIC_CATEGORIES:
             continue
         target = " ".join(_TARGET_RE.findall(entry.text))
-        if not (_NUMBER_UNIT_RE.search(target) or _Q_REF_RE.search(target)):
+        numbers = _ID_LIST_RE.sub(" ", target)  # цифры ID (M-01, CON-02) — не числа
+        if not (_NUMBER_UNIT_RE.search(numbers) or _Q_REF_RE.search(target)):
             err("GC-20", entry.eid, "цель perf/cost без числа с единицей и без ссылки на Q-NN")
 
 
 def check_owners(brief: Brief, err: Report) -> None:
-    """GC-21: владельцы процесса, данных, качества и эксплуатации названы (P или Q)."""
+    """GC-21: владельцы процесса, данных, качества и эксплуатации: P или открытый Q."""
     owned: set[str] = set()
-    for entry in (*brief.by_prefix("P"), *brief.by_prefix("Q")):
+    open_q = [e for e in brief.by_prefix("Q") if not e.resolved()]
+    for entry in (*brief.by_prefix("P"), *open_q):
         owned |= entry.owns()
     for domain in OWNER_DOMAINS:
         if domain not in owned:
-            err("GC-21", f"owns: {domain}", "владелец не назван: нет P или Q с этим owns")
+            err("GC-21", f"owns: {domain}", "владелец не назван: нет P или открытого Q с этим owns")
 
 
 def _type_msg(expected: str, value: object) -> str:

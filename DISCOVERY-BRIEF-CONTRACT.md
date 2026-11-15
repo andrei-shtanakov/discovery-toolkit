@@ -62,7 +62,7 @@ compliance. В основу фрейма customer лёг опросник вла
   сохраняется, архитектурный вывод — `Q-NN` с `owner_role: architect`.
 - **Критерии «Discovery завершён»** стали проверкой брифа там, где они механические:
   GC-18 (формат таблицы, допущения с подтверждающим и сроком), GC-19 (четыре
-  обязательные категории), GC-20 (perf/cost-цели — число с единицей или `Q-NN`), GC-21
+  обязательные категории), GC-20 (`**Category**` у каждой NFR; perf/cost-цели — число с единицей или `Q-NN`), GC-21
   (владельцы процесса, данных, качества, эксплуатации — `owns:` у `P` или открытого `Q`).
   Семантические пункты (подтверждение compliance, письменное согласие заказчика,
   эталонный набор) — чек-лист фрейма, не линтер.
@@ -167,7 +167,8 @@ traces_to: []                    # upstream: KB prograph-vault, approved custome
   помечается `` `resolved: true` `` (и не считается в счётчиках).
 - `X-NN`: `` `status: open|resolved` ``; рекомендуется `` `target: FR-02` `` — на какое
   требование конфликт указывает (обязательно для feasibility-конфликтов engineer-фрейма).
-- `NFR` (v1.3): `**Category**: perf|cost|safety|security|compliance|…`. Цель категории
+- `NFR` (v1.3, customer — обязательно): `**Category**: perf|cost|safety|security|compliance|…`
+  (несколько — через запятую). Цель категории
   `perf`/`cost` — число с единицей («p95 до 2 с», «500 запросов/день», «$300 в месяц»)
   либо ссылка на `Q-NN` исследования (GC-20).
 - Владельцы (v1.3, customer): `` `owns: process|data|quality|operations` `` (через
@@ -259,8 +260,8 @@ gate_passed = ( все required-ключи фрейма = covered, и их се�
 | GC-17 | error/warning | каждая ссылка на `Q-NN` в записи `FR`/`NFR`/`M` разрешается в запись `Q` брифа (error); ссылка на `Q` с `resolved: true` — warning: подставьте найденное значение |
 | GC-18 | error | customer: секция `## Translation table` есть и непуста; в каждой строке шесть колонок, слова заказчика непусты, категория из словаря, ограничение ссылается на существующие `FR`/`NFR`/`CON`/`OUT`; у допущения есть подтверждающий и срок `YYYY-MM-DD` |
 | GC-19 | error | customer: в translation table есть ≥1 строка каждой обязательной категории (`делать`, `не делать`, `стоить`, `доказывать`) |
-| GC-20 | error | customer: цель `NFR` с `Category: perf\|cost` — число с единицей или ссылка на `Q-NN` |
-| GC-21 | error | customer: каждый домен `process`, `data`, `quality`, `operations` закрыт `owns:` у записи `P` или `Q` |
+| GC-20 | error | customer: у каждой `NFR` есть `**Category**`; цель `NFR` категории `perf`/`cost` — число с единицей (цифры ID записей не в счёт) или ссылка на `Q-NN` |
+| GC-21 | error | customer: каждый домен `process`, `data`, `quality`, `operations` закрыт `owns:` у записи `P` или открытого (не `resolved`) `Q` |
 
 ---
 

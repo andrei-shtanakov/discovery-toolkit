@@ -271,3 +271,40 @@ def test_gc21_owner_may_be_open_question():
 def test_enterprise_rules_do_not_apply_to_engineer_frame():
     findings = run("engineer_good.md")
     assert not {f.rule for f in findings} & {"GC-18", "GC-19", "GC-20", "GC-21"}
+
+
+def test_gc20_nfr_without_category_is_error():
+    """Отсутствие Category не выключает GC-20 (ревью PR #31)."""
+    text = customer_with({"**Category**: perf · **Target**: полный": "**Target**: полный"})
+    assert gc_errors(text, "GC-20") == ["нет **Category**: без неё perf/cost-цель не проверить"]
+
+
+def test_gc20_multiple_categories_include_perf():
+    text = customer_with(
+        {
+            "**Category**: perf · **Target**: полный refresh < 5 c на 15 репо.":
+            "**Category**: safety, perf · **Target**: полный refresh — быстро."
+        }
+    )
+    assert len(gc_errors(text, "GC-20")) == 1
+
+
+@pytest.mark.parametrize("target", ["не хуже, чем у M-01 сегодня", "в рамках CON-01 и политик"])
+def test_gc20_record_id_digits_are_not_numbers(target):
+    text = customer_with(
+        {"**Target**: полный refresh < 5 c на 15 репо.": f"**Target**: {target}."}
+    )
+    assert len(gc_errors(text, "GC-20")) == 1
+
+
+def test_gc21_resolved_question_does_not_name_owner():
+    text = customer_with(
+        {
+            " `owns: data`": "",
+            "`blocking: false` — нужен ли web-UI": (
+                "`blocking: false` · `owns: data` · `resolved: true` — нужен ли web-UI"
+            ),
+            "open_questions: 2": "open_questions: 1",
+        }
+    )
+    assert gc_errors(text, "GC-21") == ["владелец не назван: нет P или открытого Q с этим owns"]
