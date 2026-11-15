@@ -17,3 +17,6 @@
       механические критерии — error (таблица, допущения с подтверждающим и сроком,
       четыре категории, perf/cost числом с единицей, владельцы `owns:`), семантические —
       чек-лист фрейма (issue #30, from: devtools#764).
+- [x] `slug: gc18-translation-header-check` — GC-18 сверяет заголовок translation table с колонками контракта v1.3 (порядок, без учёта регистра) @owner:github:andrei-shtanakov @id:gc18-translation-header-check
+      Подробно: колонки читаются по позиции — чужой или пропущенный заголовок раньше
+      молча «съедал» первую строку данных (issue #32, from: discovery-toolkit#31, ревью Copilot).

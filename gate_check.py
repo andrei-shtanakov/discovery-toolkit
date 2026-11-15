@@ -56,7 +56,10 @@ _Q_REF_RE = re.compile(r"\bQ-\d+\b")
 
 # v1.3 (issue #30): enterprise-фрейм заказчика — translation table и владельцы
 TRANSLATION_HEADING = "## Translation table"
-TRANSLATION_COLUMNS = 6  # слова | категория | ограничение | допущение | подтверждает | срок
+TRANSLATION_HEADER = (
+    "слова заказчика", "категория", "ограничение", "допущение", "подтверждает", "срок",
+)
+TRANSLATION_COLUMNS = len(TRANSLATION_HEADER)
 REQUIRED_CATEGORIES = ("делать", "не делать", "стоить", "доказывать")
 TRANSLATION_CATEGORIES = set(REQUIRED_CATEGORIES) | {
     "данные", "приёмка", "эксплуатация", "передача",
@@ -227,7 +230,7 @@ def _resolve_ref(ref: str, base_dir: Path) -> Path | None:
 
 
 def translation_rows(body: str) -> list[list[str]] | None:
-    """Строки данных секции `## Translation table` (ячейки) или None, если секции нет."""
+    """Строки секции `## Translation table` (ячейки, заголовок первым) или None."""
     lines = body.splitlines()
     start = next(
         (i for i, line in enumerate(lines) if line.strip() == TRANSLATION_HEADING), None
@@ -244,7 +247,7 @@ def translation_rows(body: str) -> list[list[str]] | None:
         if all(set(c) <= set("-: ") for c in cells) and "-" in line:  # |---|---|
             continue
         rows.append(cells)
-    return rows[1:]  # первая строка — заголовок колонок
+    return rows
 
 
 Report = Callable[[str, str, str], None]
@@ -252,9 +255,14 @@ Report = Callable[[str, str, str], None]
 
 def check_translation_table(brief: Brief, err: Report) -> None:
     """GC-18 формат строк translation table; GC-19 четыре обязательные категории."""
-    rows = translation_rows(brief.body)
-    if not rows:
+    table = translation_rows(brief.body)
+    if not table or len(table) < 2:
         err("GC-18", "Translation table", "секции нет или в ней нет строк")
+        return
+    header, rows = table[0], table[1:]
+    if tuple(c.lower() for c in header) != TRANSLATION_HEADER:
+        # колонки читаются по позиции: при чужом заголовке строки не проверить
+        err("GC-18", "Translation table", f"заголовок {header} ≠ колонкам контракта")
         return
     doc_ids = brief.ids()
     seen: set[str] = set()
