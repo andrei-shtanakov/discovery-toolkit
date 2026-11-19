@@ -20,8 +20,12 @@
 - [x] `slug: gc18-translation-header-check` — GC-18 сверяет заголовок translation table с колонками контракта v1.3 (порядок, без учёта регистра) @owner:github:andrei-shtanakov @id:gc18-translation-header-check
       Подробно: колонки читаются по позиции — чужой или пропущенный заголовок раньше
       молча «съедал» первую строку данных (issue #32, from: discovery-toolkit#31, ревью Copilot).
-- [ ] `slug: customer-frame-feature-profile` — контракт v1.4: профиль `feature` фрейма customer — короткий набор + вопросы-фильтры блоков 4–8 разметкой банка, `**N/A**` у NFR/CON закрывает GC-08/GC-20, GC-22 @owner:github:andrei-shtanakov @id:customer-frame-feature-profile
+- [x] `slug: customer-frame-feature-profile` — контракт v1.4: профиль `feature` фрейма customer — короткий набор + вопросы-фильтры блоков 4–8 разметкой банка, `**N/A**` у NFR/CON закрывает GC-08/GC-20, GC-22 (PR #36) @owner:github:andrei-shtanakov @id:customer-frame-feature-profile
       Подробно: строка `<!-- profile: feature; short: …; filter: … -->` — отдельно от
       маркера темы (старый парсер рантайма её пропускает); GC-19/GC-21 не ослаблены —
       ответ на фильтр даёт строку таблицы, вопросы о владельцах в коротком наборе
       (issue #35, from: discovery#86 ← devtools#816).
+- [x] `slug: gc05-upstream-read-total` — нечитаемый upstream engineer-брифа (не UTF-8, исчез при чтении) — находка GC-12, не исключение из `check()` (PR #37) @owner:github:andrei-shtanakov @id:gc05-upstream-read-total
+      Подробно: последний путь падения после #18 — чтение upstream для GC-05;
+      discovery снимет ограду `cli._lint_brief` на `approve` после перепина
+      (issue #34, from: discovery, todo://discovery/approve-lint-fence).

@@ -85,6 +85,17 @@ def test_traces_to_as_yaml_string_is_normalized():
     assert errors(findings) == [], [str(f) for f in findings]
 
 
+@pytest.mark.parametrize("payload", [b"\xff\xfe\x00bad", b"---\nstatus: \xff\n---\n"])
+def test_non_utf8_upstream_is_gc12_finding_not_crash(tmp_path, payload):
+    """Нечитаемый upstream — находка GC-12, не UnicodeDecodeError (issue #34)."""
+    (tmp_path / "bin.md").write_bytes(payload)
+    text = (FIXTURES / "engineer_good.md").read_text(encoding="utf-8").replace(
+        "traces_to: [customer_approved.md]", "traces_to: [bin.md]"
+    ).replace("validation: pass", "validation: fail")
+    errs = errors(check(text, base_dir=tmp_path))
+    assert [(f.rule, f.ref) for f in errs] == [("GC-12", "bin.md")], [str(f) for f in errs]
+
+
 def test_traversal_and_absolute_refs_rejected():
     from gate_check import _resolve_ref
 
