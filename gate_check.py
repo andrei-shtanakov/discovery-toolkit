@@ -79,6 +79,7 @@ _NUMBER_UNIT_RE = re.compile(r"\d[\d.,]*\s*(?:[%$€₽£°]|[^\W\d_])|[$€₽�
 PROFILES = ("full", "feature")
 NOT_APPLICABLE_PREFIXES = {"NFR", "CON"}
 _NOT_APPLICABLE_RE = re.compile(r"\*\*N/A\*\*:[ \t]*(.*)")
+_QUOTE_RE = re.compile(r"«[^»]*\S[^»]*»")  # непустая цитата слов заказчика
 
 
 @dataclass
@@ -137,12 +138,15 @@ class Entry:
         }
 
     def not_applicable(self) -> str | None:
-        """Причина из строки `**N/A**: …`; "" — маркер без причины (прочерк тоже)."""
+        """Причина из строки `**N/A**: …`; "" — маркер без причины (прочерк тоже).
+
+        Причина без цитаты «…» тоже "": «не спрашивали» — не ответ заказчика.
+        """
         m = _NOT_APPLICABLE_RE.search(self.text)
         if m is None:
             return None
         reason = m.group(1).strip()
-        return "" if reason in _EMPTY_CELL else reason
+        return reason if _QUOTE_RE.search(reason) else ""
 
     def status(self) -> str | None:
         m = re.search(r"(?<![\w*])status:\s*(\w+)", self.text)
@@ -342,7 +346,7 @@ def check_owners(brief: Brief, err: Report) -> None:
 
 
 def check_not_applicable(brief: Brief, err: Report, feature: bool) -> None:
-    """GC-22: `**N/A**` — только в профиле feature, только у NFR/CON, с причиной."""
+    """GC-22: `**N/A**` — только в feature, только у NFR/CON, с цитатой заказчика."""
     for entry in brief.entries:
         reason = entry.not_applicable()
         if reason is None:
@@ -352,7 +356,7 @@ def check_not_applicable(brief: Brief, err: Report, feature: bool) -> None:
         elif entry.prefix not in NOT_APPLICABLE_PREFIXES:
             err("GC-22", entry.eid, "**N/A** допустим только у NFR и CON")
         elif not reason:
-            err("GC-22", entry.eid, "у **N/A** нет причины")
+            err("GC-22", entry.eid, "у **N/A** нет причины словами заказчика в «…»")
 
 
 def _type_msg(expected: str, value: object) -> str:
