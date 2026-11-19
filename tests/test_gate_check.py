@@ -85,6 +85,36 @@ def test_traces_to_as_yaml_string_is_normalized():
     assert errors(findings) == [], [str(f) for f in findings]
 
 
+@pytest.mark.parametrize("payload", [b"\xff\xfe\x00bad", b"---\nstatus: \xff\n---\n"])
+def test_non_utf8_upstream_is_gc12_finding_not_crash(tmp_path, payload):
+    """Нечитаемый upstream — находка GC-12, не UnicodeDecodeError (issue #34)."""
+    (tmp_path / "bin.md").write_bytes(payload)
+    text = (FIXTURES / "engineer_good.md").read_text(encoding="utf-8").replace(
+        "traces_to: [customer_approved.md]", "traces_to: [bin.md]"
+    ).replace("validation: pass", "validation: fail")
+    errs = errors(check(text, base_dir=tmp_path))
+    assert [(f.rule, f.ref) for f in errs] == [("GC-12", "bin.md")], [str(f) for f in errs]
+
+
+def test_upstream_vanished_after_resolve_is_gc12_finding(monkeypatch):
+    """OSError между is_file() и чтением (TOCTOU) — тоже GC-12, не исключение."""
+    text = (FIXTURES / "engineer_good.md").read_text(encoding="utf-8").replace(
+        "validation: pass", "validation: fail"
+    )
+    real_read_text = Path.read_text
+
+    def read_text(self, *args, **kwargs):
+        if self.name == "customer_approved.md":
+            raise FileNotFoundError(self)
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read_text)
+    errs = errors(check(text, base_dir=FIXTURES))
+    assert [(f.rule, f.ref) for f in errs] == [("GC-12", "customer_approved.md")], [
+        str(f) for f in errs
+    ]
+
+
 def test_traversal_and_absolute_refs_rejected():
     from gate_check import _resolve_ref
 
