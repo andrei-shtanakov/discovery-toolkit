@@ -128,6 +128,21 @@ def test_unencodable_traces_ref_is_gc16_finding_not_crash(name, ref):
     ]
 
 
+@pytest.mark.parametrize("ref", ["loop/x.md", "self.md", "b/c/d.md"])
+def test_symlink_loop_in_traces_ref_is_gc16_finding_not_crash(tmp_path, ref):
+    """Цикл симлинков — GC-16, не RuntimeError из resolve() на ≤3.12 (issue #40)."""
+    (tmp_path / "loop").symlink_to("b")
+    (tmp_path / "b").symlink_to("loop")
+    (tmp_path / "self.md").symlink_to("self.md")
+    text = (FIXTURES / "customer_good.md").read_text(encoding="utf-8").replace(
+        "traces_to: []", f"traces_to: [{ref}]"
+    )
+    findings = check(text, base_dir=tmp_path)
+    assert [f.ref for f in errors(findings) if f.rule == "GC-16"] == [ref], [
+        str(f) for f in findings
+    ]
+
+
 def test_traversal_and_absolute_refs_rejected():
     from gate_check import _resolve_ref
 
