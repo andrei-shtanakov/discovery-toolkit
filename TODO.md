@@ -33,3 +33,7 @@
       Подробно: `Path.resolve()` поднимал ValueError/UnicodeEncodeError мимо `check()`;
       discovery снимет ограду `cli._lint_brief` на `approve` после перепина
       (issue #38, from: discovery, todo://discovery/approve-lint-fence).
+- [x] `slug: resolve-ref-symlink-loop` — цикл симлинков в `traces_to` — находка GC-16, не RuntimeError из `Path.resolve()` на CPython ≤3.12; CI гоняет pytest на 3.11/3.12/3.13 (PR #41) @owner:github:andrei-shtanakov @id:resolve-ref-symlink-loop
+      Подробно: на 3.13 pathlib отдаёт ELOOP как OSError, до 3.13 — RuntimeError;
+      локальный 3.13 класс не видел (issue #40, from: discovery,
+      todo://discovery/approve-lint-fence).

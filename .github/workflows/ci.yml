@@ -17,7 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-      - run: uv python install 3.12
+      # Нижняя граница requires-python и свежий CPython: pathlib меняет поведение между
+      # версиями (issue #40 — цикл симлинков: RuntimeError на ≤3.12, OSError на 3.13).
+      # Одна джоба, не matrix: ruleset требует проверку с именем ровно `test`.
+      - run: uv python install 3.11 3.12 3.13
       - run: uv sync --frozen
-      - run: uv run --frozen pytest -q
+      - run: |
+          for py in 3.11 3.12 3.13; do
+            echo "::group::pytest on $py"
+            UV_PYTHON=$py uv run --frozen --isolated pytest -q
+            echo "::endgroup::"
+          done
       - run: uv run --frozen ruff check .
