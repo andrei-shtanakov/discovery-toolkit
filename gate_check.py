@@ -137,9 +137,12 @@ class Entry:
         }
 
     def not_applicable(self) -> str | None:
-        """Причина из строки `**N/A**: …` (пустая строка — маркер без причины)."""
+        """Причина из строки `**N/A**: …`; "" — маркер без причины (прочерк тоже)."""
         m = _NOT_APPLICABLE_RE.search(self.text)
-        return None if m is None else m.group(1).strip()
+        if m is None:
+            return None
+        reason = m.group(1).strip()
+        return "" if reason in _EMPTY_CELL else reason
 
     def status(self) -> str | None:
         m = re.search(r"(?<![\w*])status:\s*(\w+)", self.text)

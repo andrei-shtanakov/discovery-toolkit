@@ -406,8 +406,10 @@ def test_feature_profile_is_customer_only():
     assert messages == ["профиль feature есть только у фрейма customer"]
 
 
-def test_feature_na_without_reason_is_gc22():
-    text = feature_with({NA_NFR: "**Category**: perf, cost\n**N/A**:"})
+@pytest.mark.parametrize("placeholder", ["", " —", " -"])
+def test_feature_na_without_reason_is_gc22(placeholder):
+    """Прочерк — конвенция «пусто» (как в ячейках GC-18), а не причина."""
+    text = feature_with({NA_NFR: f"**Category**: perf, cost\n**N/A**:{placeholder}"})
     assert gc_errors(text, "GC-22") == ["у **N/A** нет причины"]
     assert gc_errors(text, "GC-20") != []  # пустая причина цель не закрывает
 
