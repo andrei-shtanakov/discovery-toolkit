@@ -96,6 +96,25 @@ def test_non_utf8_upstream_is_gc12_finding_not_crash(tmp_path, payload):
     assert [(f.rule, f.ref) for f in errs] == [("GC-12", "bin.md")], [str(f) for f in errs]
 
 
+def test_upstream_vanished_after_resolve_is_gc12_finding(monkeypatch):
+    """OSError между is_file() и чтением (TOCTOU) — тоже GC-12, не исключение."""
+    text = (FIXTURES / "engineer_good.md").read_text(encoding="utf-8").replace(
+        "validation: pass", "validation: fail"
+    )
+    real_read_text = Path.read_text
+
+    def read_text(self, *args, **kwargs):
+        if self.name == "customer_approved.md":
+            raise FileNotFoundError(self)
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read_text)
+    errs = errors(check(text, base_dir=FIXTURES))
+    assert [(f.rule, f.ref) for f in errs] == [("GC-12", "customer_approved.md")], [
+        str(f) for f in errs
+    ]
+
+
 def test_traversal_and_absolute_refs_rejected():
     from gate_check import _resolve_ref
 
