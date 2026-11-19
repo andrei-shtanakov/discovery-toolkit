@@ -20,7 +20,10 @@ def errors(findings):
 
 # --- L1: good-фикстуры проходят гейт ---------------------------------------
 
-@pytest.mark.parametrize("name", ["customer_good.md", "customer_approved.md", "engineer_good.md"])
+@pytest.mark.parametrize(
+    "name",
+    ["customer_good.md", "customer_approved.md", "customer_feature_good.md", "engineer_good.md"],
+)
 def test_good_fixture_passes(name):
     findings = run(name)
     assert errors(findings) == [], [str(f) for f in findings]
@@ -45,6 +48,7 @@ def test_good_fixture_passes(name):
         ("bad_gc19_category_missing.md", "GC-19"),
         ("bad_gc20_perf_without_number.md", "GC-20"),
         ("bad_gc21_owner_missing.md", "GC-21"),
+        ("bad_gc22_na_outside_feature.md", "GC-22"),
     ],
 )
 def test_bad_fixture_fails_exactly_its_rule(name, expected_rule):
@@ -356,3 +360,83 @@ def test_gc18_header_only_table_is_empty():
     data = table_rows.split("\n\n## ")[0] + "\n"
     messages = gc_errors(customer_with({data: ""}), "GC-18")
     assert messages == ["секции нет или в ней нет строк"], messages
+
+
+# --- L1: профиль feature — фича в существующем репо (v1.4, issue #35) ---------
+
+NA_NFR = (
+    "**Category**: perf, cost\n"
+    "**N/A**: фильтр блока 4 — «нет»: «это пара сотен строк, работает как всё "
+    "приложение»; отдельных требований к скорости и затратам нет."
+)
+
+
+def feature_with(replacements: dict[str, str]) -> str:
+    text = (FIXTURES / "customer_feature_good.md").read_text(encoding="utf-8")
+    for old, new in replacements.items():
+        assert old in text, f"фикстура не содержит {old!r}"
+        text = text.replace(old, new)
+    return text
+
+
+def test_full_profile_rejects_na_as_perf_cost_target():
+    """Без профиля feature «не применимо» не закрывает GC-20/GC-08 — и это GC-22."""
+    text = feature_with({"  profile: feature\n": "", "validation: pass": "validation: fail"})
+    rules = {f.rule for f in errors(check(text, base_dir=FIXTURES))}
+    assert rules == {"GC-08", "GC-20", "GC-22"}, rules
+
+
+def test_explicit_full_profile_equals_absent():
+    text = customer_with({"  frame: customer\n": "  frame: customer\n  profile: full\n"})
+    assert errors(check(text, base_dir=FIXTURES)) == []
+
+
+@pytest.mark.parametrize("profile", ["short", "[feature]", "Feature"])
+def test_unknown_profile_is_gc03(profile):
+    text = feature_with({"profile: feature": f"profile: {profile}"})
+    refs = [f.ref for f in errors(check(text, base_dir=FIXTURES)) if f.rule == "GC-03"]
+    assert refs == ["interview.profile"]
+
+
+def test_feature_profile_is_customer_only():
+    text = (FIXTURES / "engineer_good.md").read_text(encoding="utf-8").replace(
+        "  frame: engineer\n", "  frame: engineer\n  profile: feature\n"
+    )
+    messages = [f.message for f in errors(check(text, base_dir=FIXTURES)) if f.rule == "GC-03"]
+    assert messages == ["профиль feature есть только у фрейма customer"]
+
+
+def test_feature_na_without_reason_is_gc22():
+    text = feature_with({NA_NFR: "**Category**: perf, cost\n**N/A**:"})
+    assert gc_errors(text, "GC-22") == ["у **N/A** нет причины"]
+    assert gc_errors(text, "GC-20") != []  # пустая причина цель не закрывает
+
+
+def test_feature_na_on_fr_is_gc22():
+    text = feature_with(
+        {"**Acceptance**: повторный экспорт": "**N/A**: не спрашивали\n**Acceptance**: повторный экспорт"}
+    )
+    assert gc_errors(text, "GC-22") == ["**N/A** допустим только у NFR и CON"]
+
+
+def test_feature_profile_keeps_perf_cost_records_required():
+    """«Не применимо» — запись, а не пустота: NFR perf/cost в брифе фичи обязательны."""
+    text = feature_with({"**Category**: perf, cost\n": "**Category**: safety\n"})
+    assert sorted(gc_errors(text, "GC-20")) == [
+        "нет ни одной NFR категории cost",
+        "нет ни одной NFR категории perf",
+    ]
+
+
+def test_feature_profile_keeps_translation_and_owner_rules():
+    """GC-19/GC-21 под профилем не ослаблены: ответ на фильтр — слова заказчика."""
+    text = feature_with(
+        {
+            "| «там только мои слова» | доказывать | CON-01 | — | — | — |\n": "",
+            "`owns: process, data, quality, operations`": "`owns: process, data, operations`",
+        }
+    )
+    assert gc_errors(text, "GC-19") == ["нет ни одной строки категории «доказывать»"]
+    assert gc_errors(text, "GC-21") == [
+        "владелец не назван: нет P или открытого Q с этим owns"
+    ]

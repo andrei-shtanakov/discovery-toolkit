@@ -1,6 +1,6 @@
-"""gate_check — линтер discovery-brief по контракту DISCOVERY-BRIEF-CONTRACT.md (v1.3).
+"""gate_check — линтер discovery-brief по контракту DISCOVERY-BRIEF-CONTRACT.md (v1.4).
 
-Правила GC-01…GC-21 — нормативный реестр в контракте §5. Каждое finding несёт ID
+Правила GC-01…GC-22 — нормативный реестр в контракте §5. Каждое finding несёт ID
 правила; выход 1, если есть хотя бы одна ошибка.
 
 Запуск: uv run gate_check.py <brief.md> [<brief2.md> ...]
@@ -75,6 +75,11 @@ _OWNS_RE = re.compile(r"owns:\s*([a-z][a-z, ]*)")
 # число с единицей: «2 с», «500 запросов/день», «95%», «40 000 ₽», «$300», «€ 40»
 _NUMBER_UNIT_RE = re.compile(r"\d[\d.,]*\s*(?:[%$€₽£°]|[^\W\d_])|[$€₽£]\s*\d")
 
+# v1.4 (issue #35): профиль интервью; feature — фича в существующем репо (customer)
+PROFILES = ("full", "feature")
+NOT_APPLICABLE_PREFIXES = {"NFR", "CON"}
+_NOT_APPLICABLE_RE = re.compile(r"\*\*N/A\*\*:[ \t]*(.*)")
+
 
 @dataclass
 class Entry:
@@ -130,6 +135,11 @@ class Entry:
         return {
             d.strip() for m in _OWNS_RE.finditer(self.text) for d in m.group(1).split(",")
         }
+
+    def not_applicable(self) -> str | None:
+        """Причина из строки `**N/A**: …` (пустая строка — маркер без причины)."""
+        m = _NOT_APPLICABLE_RE.search(self.text)
+        return None if m is None else m.group(1).strip()
 
     def status(self) -> str | None:
         m = re.search(r"(?<![\w*])status:\s*(\w+)", self.text)
@@ -293,8 +303,11 @@ def check_translation_table(brief: Brief, err: Report) -> None:
             err("GC-19", "Translation table", f"нет ни одной строки категории «{category}»")
 
 
-def check_numeric_targets(brief: Brief, err: Report) -> None:
-    """GC-20: у NFR есть Category; perf/cost есть и числом с единицей либо Q-NN."""
+def check_numeric_targets(brief: Brief, err: Report, feature: bool) -> None:
+    """GC-20: у NFR есть Category; perf/cost есть и числом с единицей либо Q-NN.
+
+    В профиле feature цель perf/cost закрывает и `**N/A**: <почему>` (v1.4).
+    """
     present = set().union(*(e.categories() for e in brief.by_prefix("NFR")))
     for category in sorted(NUMERIC_CATEGORIES - present):
         err("GC-20", f"Category: {category}", f"нет ни одной NFR категории {category}")
@@ -307,8 +320,11 @@ def check_numeric_targets(brief: Brief, err: Report) -> None:
             continue
         target = " ".join(_TARGET_RE.findall(entry.text))
         numbers = _ID_LIST_RE.sub(" ", target)  # цифры ID (M-01, CON-02) — не числа
-        if not (_NUMBER_UNIT_RE.search(numbers) or _Q_REF_RE.search(target)):
-            err("GC-20", entry.eid, "цель perf/cost без числа с единицей и без ссылки на Q-NN")
+        if _NUMBER_UNIT_RE.search(numbers) or _Q_REF_RE.search(target):
+            continue
+        if feature and entry.not_applicable():
+            continue
+        err("GC-20", entry.eid, "цель perf/cost без числа с единицей и без ссылки на Q-NN")
 
 
 def check_owners(brief: Brief, err: Report) -> None:
@@ -322,13 +338,27 @@ def check_owners(brief: Brief, err: Report) -> None:
             err("GC-21", f"owns: {domain}", "владелец не назван: нет P или открытого Q с этим owns")
 
 
+def check_not_applicable(brief: Brief, err: Report, feature: bool) -> None:
+    """GC-22: `**N/A**` — только в профиле feature, только у NFR/CON, с причиной."""
+    for entry in brief.entries:
+        reason = entry.not_applicable()
+        if reason is None:
+            continue
+        if not feature:
+            err("GC-22", entry.eid, "**N/A** допустим только в профиле feature")
+        elif entry.prefix not in NOT_APPLICABLE_PREFIXES:
+            err("GC-22", entry.eid, "**N/A** допустим только у NFR и CON")
+        elif not reason:
+            err("GC-22", entry.eid, "у **N/A** нет причины")
+
+
 def _type_msg(expected: str, value: object) -> str:
     """Текст finding о неверной форме поля frontmatter."""
     return f"ожидается {expected}, получено {type(value).__name__}"
 
 
 def check(text: str, base_dir: Path | None = None) -> list[Finding]:
-    """Прогнать все правила GC-01…GC-21; вернуть findings (errors + warnings)."""
+    """Прогнать все правила GC-01…GC-22; вернуть findings (errors + warnings)."""
     findings: list[Finding] = []
 
     def err(rule: str, ref: str, msg: str) -> None:
@@ -375,6 +405,13 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
     for i, s in enumerate(sessions):
         if not (isinstance(s, dict) and s.get("participant_role")):
             err("GC-03", f"interview.sessions[{i}]", "нет participant_role")
+    # v1.4: профиль; нет поля — full. feature — только у customer
+    profile = interview.get("profile", "full")
+    if not isinstance(profile, str) or profile not in PROFILES:
+        err("GC-03", "interview.profile", f"profile={profile!r}, ожидается full|feature")
+    elif profile == "feature" and frame_name != "customer":
+        err("GC-03", "interview.profile", "профиль feature есть только у фрейма customer")
+    feature = profile == "feature" and frame_name == "customer"
 
     # GC-04 coverage: required-ключи + допустимые значения
     coverage = meta.get("coverage") or {}
@@ -464,7 +501,7 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
         if not entry.has_acceptance():
             err("GC-08", entry.eid, "нет **Acceptance**")
     for entry in brief.by_prefix("NFR"):
-        if not entry.has_acceptance():
+        if not (entry.has_acceptance() or (feature and entry.not_applicable())):
             err("GC-08", entry.eid, "нет **Acceptance**/**Target**")
 
     # GC-09 Q: owner_role+blocking; X: status
@@ -536,8 +573,11 @@ def check(text: str, base_dir: Path | None = None) -> list[Finding]:
     # GC-18…GC-21 enterprise-фрейм заказчика (v1.3): translation table и владельцы
     if frame_name == "customer":
         check_translation_table(brief, err)
-        check_numeric_targets(brief, err)
+        check_numeric_targets(brief, err, feature)
         check_owners(brief, err)
+
+    # GC-22 «не применимо» (v1.4): отфильтрованный блок профиля feature
+    check_not_applicable(brief, err, feature)
 
     # GC-17 число как исследование: ссылка на Q-NN из FR/NFR/M разрешается в Q брифа
     questions = {e.eid: e for e in brief.by_prefix("Q")}
