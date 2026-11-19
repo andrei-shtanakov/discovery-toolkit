@@ -115,6 +115,19 @@ def test_upstream_vanished_after_resolve_is_gc12_finding(monkeypatch):
     ]
 
 
+@pytest.mark.parametrize("ref", ['"x\\0.md"', '"\\ud800.md"'])
+@pytest.mark.parametrize("name", ["customer_good.md", "engineer_good.md"])
+def test_unencodable_traces_ref_is_gc16_finding_not_crash(name, ref):
+    """NUL или суррогат в строке traces_to — GC-16, не ValueError (issue #38)."""
+    text = (FIXTURES / name).read_text(encoding="utf-8")
+    for old in ("traces_to: []", "traces_to: [customer_approved.md]"):
+        text = text.replace(old, f"traces_to: [{ref}]")
+    findings = check(text, base_dir=FIXTURES)
+    assert [f.rule for f in errors(findings) if f.rule == "GC-16"] == ["GC-16"], [
+        str(f) for f in findings
+    ]
+
+
 def test_traversal_and_absolute_refs_rejected():
     from gate_check import _resolve_ref
 

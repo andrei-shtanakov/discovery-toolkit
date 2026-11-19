@@ -29,3 +29,7 @@
       Подробно: последний путь падения после #18 — чтение upstream для GC-05;
       discovery снимет ограду `cli._lint_brief` на `approve` после перепина
       (issue #34, from: discovery, todo://discovery/approve-lint-fence).
+- [x] `slug: resolve-ref-total` — строка `traces_to`, которую ОС не примет как путь (NUL, одиночный суррогат, слишком длинный путь), — находка GC-16, не исключение из `_resolve_ref` (PR #39) @owner:github:andrei-shtanakov @id:resolve-ref-total
+      Подробно: `Path.resolve()` поднимал ValueError/UnicodeEncodeError мимо `check()`;
+      discovery снимет ограду `cli._lint_brief` на `approve` после перепина
+      (issue #38, from: discovery, todo://discovery/approve-lint-fence).
