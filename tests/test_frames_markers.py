@@ -116,3 +116,90 @@ def test_question_bullets_are_not_composer_instructions(frame):
     """
     leaked = [b for b in question_bullets(frame) if _ID_TEMPLATE_RE.search(b)]
     assert not leaked, f"{frame}: инструкции под видом вопросов: {leaked}"
+
+
+# --- профиль feature: короткий набор и вопросы-фильтры (контракт v1.4, issue #35) ---
+
+PROFILE_FRAMES = {"customer"}  # профиль feature есть только у customer (GC-03)
+_PROFILE_RE = re.compile(
+    r"^<!--\s*profile:\s*feature;\s*short:\s*(none|\d+(?:,\d+)*)"
+    r"(?:;\s*filter:\s*([^;]+?))?\s*-->$"
+)
+
+
+def profile_topics(frame: str) -> list[tuple[str, str, int, list[int], str | None]]:
+    """Темы с ключом: (заголовок, ключ, число вопросов, short, filter).
+
+    Строка профиля стоит сразу под маркером темы; число вопросов — `- `-пункты темы
+    (с продолжениями), как их нумерует runtime.
+    """
+    lines = (FRAMES_DIR / f"{frame}.md").read_text(encoding="utf-8").splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(BANK_HEADING))
+    result = []
+    for i, line in enumerate(lines[start:], start):
+        if line.startswith("## ") and i > start:
+            break
+        marker = _MARKER_RE.match(line)
+        if not marker or marker.group(1) == "none":
+            continue
+        heading = lines[i - 1]
+        profile = _PROFILE_RE.match(lines[i + 1])
+        assert profile, f"{frame}/{heading}: нет строки профиля под маркером"
+        count = 0
+        for body in lines[i + 2 :]:
+            if body.startswith("#"):
+                break
+            count += body.startswith("- ")
+        short = [] if profile.group(1) == "none" else [int(n) for n in profile.group(1).split(",")]
+        result.append((heading, marker.group(1), count, short, profile.group(2)))
+    return result
+
+
+def test_profile_lines_only_in_profile_frames():
+    """Строка профиля у фрейма без профиля — разметка, которую никто не прочтёт."""
+    for frame in sorted(set(FRAMES) - PROFILE_FRAMES):
+        text = (FRAMES_DIR / f"{frame}.md").read_text(encoding="utf-8")
+        assert "<!-- profile:" not in text, f"{frame}: профиль feature не для этого фрейма"
+
+
+@pytest.mark.parametrize("frame", sorted(PROFILE_FRAMES))
+def test_short_set_indexes_existing_questions(frame):
+    """Номера `short` — позиции `- `-пунктов темы: 1…N, по возрастанию, без повторов."""
+    for heading, _, count, short, _ in profile_topics(frame):
+        assert short == sorted(set(short)), f"{frame}/{heading}: short={short}"
+        assert all(1 <= n <= count for n in short), (
+            f"{frame}/{heading}: short={short}, а вопросов {count}"
+        )
+
+
+@pytest.mark.parametrize("frame", sorted(PROFILE_FRAMES))
+def test_every_topic_reachable_in_feature_profile(frame):
+    """Тема без short и без фильтра в профиле feature молча исчезла бы."""
+    for heading, _, _, short, filt in profile_topics(frame):
+        assert short or filt, f"{frame}/{heading}: ни short, ни filter"
+
+
+@pytest.mark.parametrize("frame", sorted(PROFILE_FRAMES))
+def test_every_required_key_asked_in_feature_profile(frame):
+    """Каждый required-ключ получает в профиле feature хотя бы один вопрос."""
+    asked = {key for _, key, _, short, filt in profile_topics(frame) if short or filt}
+    missing = set(FRAMES[frame]["required"]) - asked
+    assert not missing, f"{frame}: в профиле feature ключи без вопросов: {sorted(missing)}"
+
+
+@pytest.mark.parametrize("frame", sorted(PROFILE_FRAMES))
+def test_filters_are_questions_to_a_human(frame):
+    """Фильтр задаётся человеку как есть: вопрос, без шаблонов ID составителю."""
+    for heading, _, _, _, filt in profile_topics(frame):
+        if filt is None:
+            continue
+        assert filt.endswith("?"), f"{frame}/{heading}: фильтр не вопрос: {filt!r}"
+        assert not _ID_TEMPLATE_RE.search(filt), f"{frame}/{heading}: {filt!r}"
+
+
+def test_customer_short_set_is_short():
+    """Смысл профиля — длина: короткий набор (с фильтрами) не больше трети банка."""
+    rows = profile_topics("customer")
+    full = sum(count for _, _, count, _, _ in rows)
+    short = sum(len(s) + (f is not None) for _, _, _, s, f in rows)
+    assert short * 3 <= full, f"короткий набор {short} из {full}"
